@@ -11,6 +11,11 @@ interface AuthStackProps extends cdk.StackProps {
 
 // TODO
 // Create a better user verification flow
+// // Where I left off 3/23/2023
+// // I extended the lambda to support the verify account flow
+// // So when you come back, confirm that you can sign up and verify an account
+// // Then after that, add the functionality for the other flows / paths (signin, signout, etc)
+
 // Move API Gateway to a separate stack
 // // We will add the /auth/ path to the API Gateway in this stack (AuthStack)
 
@@ -76,11 +81,26 @@ export class AuthStack extends cdk.Stack {
       restApiName: `${appName}-auth-api`,
     });
 
-    // 
+    // Define an AWS API Gateway integration.  This is the God lambda function that will handle all auth tasks.  Can bring this up later.
     const integration = new apigateway.LambdaIntegration(lambdaFunction);
 
-    // Define an API Gateway resource and method
-    const resource = api.root.addResource('auth');
-    const method = resource.addMethod('POST', integration);    
+    // Add a resource for auth
+    const authResource = api.root.addResource('auth');
+
+    // Add a sub-resource for signup
+    const signupResource = authResource.addResource('signup');
+    const signupMethod = signupResource.addMethod('POST', integration);
+
+    // Add a sub-resource for verify
+    const verifyResource = authResource.addResource('verify');
+    const verifyMethod = verifyResource.addMethod('POST', integration);
+
+    // Add a sub-resource for signin
+    const signinResource = authResource.addResource('signin');
+    const signinMethod = signinResource.addMethod('POST', integration);
+
+    // Add a sub-resource for signout
+    const signoutResource = authResource.addResource('signout');
+    const signoutMethod = signoutResource.addMethod('POST', integration);
   }
 }
