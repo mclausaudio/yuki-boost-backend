@@ -1,12 +1,18 @@
-import { CognitoIdentityProviderClient, SignUpCommand } from "@aws-sdk/client-cognito-identity-provider";
+import { 
+  CognitoIdentityProviderClient,
+  SignUpCommand, 
+  ConfirmSignUpCommand,
+
+} from "@aws-sdk/client-cognito-identity-provider";
 
 const USER_POOL_CLIENT_ID = process.env.USER_POOL_CLIENT_ID;
 
-async function signUp(email: string, password: string, username: string): Promise<string> {
-  const client = new CognitoIdentityProviderClient({ region: "us-east-1" });
+const cognito = new CognitoIdentityProviderClient({ region: "us-east-1" });
 
+async function signUp(email: string, password: string, username: string): Promise<string> {
+  
   const params = {
-    ClientId: USER_POOL_CLIENT_ID, // replace with your User Pool App Client ID
+    ClientId: USER_POOL_CLIENT_ID,
     Username: username,
     Password: password,
     UserAttributes: [
@@ -20,7 +26,26 @@ async function signUp(email: string, password: string, username: string): Promis
   const command = new SignUpCommand(params);
 
   try {
-    await client.send(command);
+    await cognito.send(command);
+    return 'success';
+  } catch (error) {
+    console.error(error);
+    throw new Error(`Error creating user: ${error}`);
+  }
+}
+
+async function verifyAccount(username: string, verificationCode: string): Promise<string> {
+  
+  const params = {
+    ClientId: USER_POOL_CLIENT_ID,
+    Username: username,
+    ConfirmationCode: verificationCode,
+  };
+
+  const command = new ConfirmSignUpCommand(params);
+
+  try {
+    await cognito.send(command);
     return 'success';
   } catch (error) {
     console.error(error);
@@ -30,8 +55,14 @@ async function signUp(email: string, password: string, username: string): Promis
 
 exports.handler = async (event: any) => {
   console.log('BODY no parse :: ',event.body);
-  
-  const {email, password, username } = JSON.parse(event.body);
+  const rootPath = '/auth';
+  const { httpMethod, path } = event;
+  const { 
+    email,
+    password,
+    username,
+    verificationCode = null,
+  } = JSON.parse(event.body);
 
   // if (!username || !password || !email) {
   //   return {
@@ -41,8 +72,31 @@ exports.handler = async (event: any) => {
   // }
 
   try {
-    const signup = await signUp(email, password, username);
-    console.log('signup :: ', signup);
+    // Determine if the http method is POST
+    if (httpMethod !== 'POST') {
+      return {
+        statusCode: 405,
+        body: JSON.stringify({ message: 'Method not allowed' }),
+      };
+    }
+    if (path === `${rootPath}/signup`) {
+      const signup = await signUp(email, password, username);
+    } else
+    // if (path === `${rootPath}/signin`) {
+    //   const signin = await signIn(username, password);
+    // } else
+    if (path === `${rootPath}/verify`) {
+      const verify = await verifyAccount(username, verificationCode);
+    } 
+    // else
+    // if (path === `${rootPath}/signout`) {
+    //   const signout = await signOut(username);
+    // } else {
+    //   return {
+    //     statusCode: 404,
+    //     body: JSON.stringify({ message: 'Not found' }),
+    //   };
+    // }
   } catch (error) {
     console.error('Error creating user', error)
     return {
