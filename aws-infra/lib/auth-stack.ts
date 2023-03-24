@@ -4,17 +4,19 @@ import { Construct } from 'constructs';
 import * as cognito from 'aws-cdk-lib/aws-cognito';
 import * as lambda from 'aws-cdk-lib/aws-lambda';
 import * as apigateway from 'aws-cdk-lib/aws-apigateway';
+import * as iam from 'aws-cdk-lib/aws-iam';
 
 interface AuthStackProps extends cdk.StackProps {
   appName: string;
 }
 
 // TODO
-// Create a better user verification flow
-// // Where I left off 3/23/2023
-// // I extended the lambda to support the verify account flow
-// // So when you come back, confirm that you can sign up and verify an account
-// // Then after that, add the functionality for the other flows / paths (signin, signout, etc)
+// Add the functionality for the other flows / paths (signin, signout, etc)
+// // 3/24/23 - leaving the office
+// // // I can register, verify, but having trouble signing in. Permissions problems.
+
+
+
 
 // Move API Gateway to a separate stack
 // // We will add the /auth/ path to the API Gateway in this stack (AuthStack)
@@ -23,7 +25,7 @@ export class AuthStack extends cdk.Stack {
   constructor(scope: Construct, id: string, props: AuthStackProps) {
     super(scope, id, props);
 
-    const { appName } = props;
+    const { appName, env } = props;
 
     // First, define an AWS Cognito pool
     const userPool = new cognito.UserPool(this, 'UserPool', {
@@ -65,6 +67,24 @@ export class AuthStack extends cdk.Stack {
       },
     });
 
+    // // Grant the lambda function permission to access the user pool
+    const lambdaFunctionRole = new iam.Role(this, 'AuthLambdaFunctionRole', {
+      assumedBy: new iam.ServicePrincipal('lambda.amazonaws.com'),
+    });
+    
+    lambdaFunctionRole.addToPolicy(new iam.PolicyStatement({
+      effect: iam.Effect.ALLOW,
+      actions: [
+        'cognito-idp:AdminInitiateAuth',
+        'cognito-idp:SignUp',
+        'cognito-idp:ConfirmSignUp',
+      ],
+      resources: [
+        userPool.userPoolArn,
+        `${userPool.userPoolArn}/client/*`,
+      ],
+    }));
+
     // Define an AWS Lambda function
     const lambdaFunction = new lambda.Function(this, 'AuthLambdaFunction', {
       functionName: `${appName}-auth-function`,
@@ -73,7 +93,10 @@ export class AuthStack extends cdk.Stack {
       code: lambda.Code.fromAsset('./lambda/auth'),
       environment: {
         USER_POOL_CLIENT_ID: userPoolClient.userPoolClientId,
+        USER_POOL_ID: userPool.userPoolId,
+        REGION: env?.region || "us-east-1"
       },
+      role: lambdaFunctionRole,
     });
 
     // Define an AWS API Gateway
