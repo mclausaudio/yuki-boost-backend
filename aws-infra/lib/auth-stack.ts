@@ -11,11 +11,8 @@ interface AuthStackProps extends cdk.StackProps {
 }
 
 // TODO
-// Add the functionality for the other flows / paths (signin, signout, etc)
-// // 3/24/23 - leaving the office
-// // // I can register, verify, but having trouble signing in. Permissions problems.
-
-
+// Where I left off:
+// // I finished the AuthStack and AuthLambdaFunction, I can sign up, verify, sign in, and sign out.
 
 
 // Move API Gateway to a separate stack
