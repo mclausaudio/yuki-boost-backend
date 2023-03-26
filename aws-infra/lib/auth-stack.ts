@@ -10,15 +10,10 @@ interface AuthStackProps extends cdk.StackProps {
   appName: string;
 }
 
-// TODO
-// Where I left off:
-// // I finished the AuthStack and AuthLambdaFunction, I can sign up, verify, sign in, and sign out.
-
-
-// Move API Gateway to a separate stack
-// // We will add the /auth/ path to the API Gateway in this stack (AuthStack)
-
 export class AuthStack extends cdk.Stack {
+  // Need to export the Auth Lambda function to the ApiGatewayStack
+  public readonly authStackApiLambda: lambda.Function;
+
   constructor(scope: Construct, id: string, props: AuthStackProps) {
     super(scope, id, props);
 
@@ -83,7 +78,7 @@ export class AuthStack extends cdk.Stack {
     }));
 
     // Define an AWS Lambda function
-    const lambdaFunction = new lambda.Function(this, 'AuthLambdaFunction', {
+    const authStackApiLambda = new lambda.Function(this, 'AuthLambdaFunction', {
       functionName: `${appName}-auth-function`,
       runtime: lambda.Runtime.NODEJS_18_X,
       handler: 'index.handler',
@@ -95,32 +90,7 @@ export class AuthStack extends cdk.Stack {
       },
       role: lambdaFunctionRole,
     });
-
-    // Define an AWS API Gateway
-    const api = new apigateway.RestApi(this, 'AuthApiGateway', {
-      restApiName: `${appName}-auth-api`,
-    });
-
-    // Define an AWS API Gateway integration.  This is the God lambda function that will handle all auth tasks.  Can bring this up later.
-    const integration = new apigateway.LambdaIntegration(lambdaFunction);
-
-    // Add a resource for auth
-    const authResource = api.root.addResource('auth');
-
-    // Add a sub-resource for signup
-    const signupResource = authResource.addResource('signup');
-    const signupMethod = signupResource.addMethod('POST', integration);
-
-    // Add a sub-resource for verify
-    const verifyResource = authResource.addResource('verify');
-    const verifyMethod = verifyResource.addMethod('POST', integration);
-
-    // Add a sub-resource for signin
-    const signinResource = authResource.addResource('signin');
-    const signinMethod = signinResource.addMethod('POST', integration);
-
-    // Add a sub-resource for signout
-    const signoutResource = authResource.addResource('signout');
-    const signoutMethod = signoutResource.addMethod('POST', integration);
+    // export the lambda function for the ApiGatewayStack
+    this.authStackApiLambda = authStackApiLambda;
   }
 }
