@@ -3,11 +3,12 @@ import { Construct } from 'constructs';
 
 import * as cognito from 'aws-cdk-lib/aws-cognito';
 import * as lambda from 'aws-cdk-lib/aws-lambda';
-import * as apigateway from 'aws-cdk-lib/aws-apigateway';
+import * as dynamodb from 'aws-cdk-lib/aws-dynamodb';
 import * as iam from 'aws-cdk-lib/aws-iam';
 
 interface AuthStackProps extends cdk.StackProps {
   appName: string;
+  dynamoDbTable: dynamodb.Table;
 }
 
 export class AuthStack extends cdk.Stack {
@@ -17,7 +18,7 @@ export class AuthStack extends cdk.Stack {
   constructor(scope: Construct, id: string, props: AuthStackProps) {
     super(scope, id, props);
 
-    const { appName, env } = props;
+    const { appName, env, dynamoDbTable } = props;
 
     // First, define an AWS Cognito pool
     const userPool = new cognito.UserPool(this, 'UserPool', {
@@ -77,12 +78,12 @@ export class AuthStack extends cdk.Stack {
       ],
     }));
 
-    // Define an AWS Lambda function
+    // Define an AWS Lambda function, this is the lambda that will be called by the API Gateway
     const authStackApiLambda = new lambda.Function(this, 'AuthLambdaFunction', {
       functionName: `${appName}-auth-function`,
       runtime: lambda.Runtime.NODEJS_18_X,
       handler: 'index.handler',
-      code: lambda.Code.fromAsset('./lambda/auth'),
+      code: lambda.Code.fromAsset('./lambda/auth/apiRoutes'),
       environment: {
         USER_POOL_CLIENT_ID: userPoolClient.userPoolClientId,
         USER_POOL_ID: userPool.userPoolId,
@@ -92,5 +93,21 @@ export class AuthStack extends cdk.Stack {
     });
     // export the lambda function for the ApiGatewayStack
     this.authStackApiLambda = authStackApiLambda;
+
+    // Now we need to make a lambda function to create the user in the DynamoDB table
+    // This will be called by the userPool's POST_CONFIRMATION trigger
+    const createUserInDbTableLambda = new lambda.Function(this, 'CreateUserInDbTableLambda', {
+      functionName: `${appName}-create-user-in-db-table-function`,
+      runtime: lambda.Runtime.NODEJS_18_X,
+      handler: 'index.handler',
+      code: lambda.Code.fromAsset('./lambda/auth/createUserInDbTable'),
+      environment: {
+        USER_TABLE_NAME: dynamoDbTable.tableName || "UserTable",
+        REGION: env?.region || "us-east-1"
+      }
+    });
+
+    dynamoDbTable.grantWriteData(createUserInDbTableLambda);
+    userPool.addTrigger(cognito.UserPoolOperation.POST_CONFIRMATION, createUserInDbTableLambda);
   }
 }
